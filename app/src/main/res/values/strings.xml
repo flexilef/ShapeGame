@@ -1,0 +1,9 @@
+<resources>
+    <string name="app_name">ShapeGame</string>
+
+    <string name="button_label_rect">RECT</string>
+    <string name="button_label_circ">CIRC</string>
+    <string name="button_label_clear">CLEAR</string>
+
+    <string name="action_settings">Settings</string>
+</resources>
