@@ -24,15 +24,30 @@ public class Rectangle extends Shape {
         width = 200;
     }
 
-    public Rectangle(Context context, float x, float y,
+    public Rectangle(Context context, Coordinates coords,
                      float length, float width, int color) {
         super(context);
 
-        this.xCenter = x;
-        this.yCenter = y;
+        //coords.x and coords.y represent the center of the rectangle
+        this.coords.x = coords.x;
+        this.coords.y = coords.y;
+
         this.length = length;
         this.width = width;
         this.color = color;
+    }
+
+    //params is expected to be two elements: the first is the length, and
+    //the second is the width
+    public void setSize(float[] params) {
+
+        if(params != null && params.length == 2) {
+            this.length = params[0];
+            this.width = params[1];
+        }
+        else {
+            throw new RuntimeException("Error: Failed to set Rectangle's size... Argument list is not 2 elements");
+        }
     }
 
     public ShapeType getShapeType() {
@@ -45,10 +60,10 @@ public class Rectangle extends Shape {
         Paint paint = new Paint();
         paint.setColor(color);
 
-        float topLeftX = xCenter - length/2;
-        float topLeftY = yCenter - width/2;
-        float botRightX = xCenter + length/2;
-        float botRightY = yCenter + width/2;
+        float topLeftX = coords.x - length/2;
+        float topLeftY = coords.y - width/2;
+        float botRightX = coords.x + length/2;
+        float botRightY = coords.y + width/2;
 
         canvas.drawRect(topLeftX, topLeftY, botRightX, botRightY, paint);
     }

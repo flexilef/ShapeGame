@@ -11,19 +11,17 @@ import android.view.View;
  */
 public abstract class Shape extends View {
 
-    protected float xCenter;
-    protected float yCenter;
-    protected int color;
-
     public enum ShapeType {
         CIRCLE, RECTANGLE
     }
 
+    protected Coordinates coords;
+    protected int color;
+
     public Shape(Context context) {
         super(context);
 
-        xCenter = 0;
-        yCenter = 0;
+        coords = new Coordinates(0 ,0);
         color = Color.argb(255, 0, 0, 0);
     }
 
@@ -41,6 +39,44 @@ public abstract class Shape extends View {
         setVisibility(GONE);
     }
 
+    public Coordinates getCoords() {
+
+        return coords;
+    }
+
+    public void setCoords(Coordinates position) {
+
+        coords.x = position.x;
+        coords.y = position.y;
+    }
+
+    public int getColor() {
+
+        return color;
+    }
+
+    public int getColorAlpha() {
+
+        return Color.alpha(color);
+    }
+
+    public void setColor(int color) {
+
+        this.color = color;
+    }
+
+    public void setColorAlpha(int alpha) {
+
+        int red = Color.red(color);
+        int green = Color.green(color);
+        int blue = Color.blue(color);
+
+        this.color = Color.argb(alpha, red, green, blue);
+    }
+
     public abstract ShapeType getShapeType();
     public abstract void onDraw(Canvas canvas);
+
+    //params is an array of floats used to initialize the size of a shape
+    public abstract void setSize(float[] params);
 }

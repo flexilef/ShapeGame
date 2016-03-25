@@ -17,13 +17,30 @@ public class Circle extends Shape {
         radius = 100;
     }
 
-    public Circle(Context context, float x, float y, float radius, int color) {
+    public Circle(Context context, Coordinates coords, float radius, int color) {
         super(context);
 
-        this.xCenter = x;
-        this.yCenter = y;
+        //coords.x and coords.y represent the center of the circle
+        this.coords.x = coords.x;
+        this.coords.y = coords.y;
+
         this.radius = radius;
         this.color = color;
+    }
+
+    public void setRadius(float radius) {
+
+        this.radius = radius;
+    }
+
+    public void setSize(float params[]) {
+
+        if(params != null && params.length == 1) {
+            this.radius = params[0];
+        }
+        else {
+            throw new RuntimeException("Error: Failed to set Circle's size... Argument list is not 1 element");
+        }
     }
 
     public Shape.ShapeType getShapeType() {
@@ -36,6 +53,6 @@ public class Circle extends Shape {
         Paint paint = new Paint();
         paint.setColor(color);
 
-        canvas.drawCircle(xCenter, yCenter, radius, paint);
+        canvas.drawCircle(coords.x, coords.y, radius, paint);
     }
 }
