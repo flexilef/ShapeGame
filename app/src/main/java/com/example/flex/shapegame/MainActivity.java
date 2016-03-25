@@ -65,6 +65,9 @@ public class MainActivity extends AppCompatActivity {
     private TextView mTextViewLevelPoints;
     private TextView mTextViewCircleCount;
     private TextView mTextViewRectCount;
+    private Button rectButton;
+    private Button circButton;
+    private Button clearButton;
 
     //game info
     private int totalPoints;
@@ -72,6 +75,7 @@ public class MainActivity extends AppCompatActivity {
     private int advanceLevelPoints;
     private int currentLevel;
     private long levelTime;
+    private long levelTimeLeft;
     private boolean gameOver;
 
     @Override
@@ -85,122 +89,45 @@ public class MainActivity extends AppCompatActivity {
         if(actionBar != null)
             actionBar.hide();
 
-        //get max screen size
+        //setup screen info
         Display display = getWindowManager().getDefaultDisplay();
         Point displaySize = new Point();
         display.getSize(displaySize);
         screenWidth = displaySize.x;
         screenHeight = displaySize.y;
 
-        //setup the surface to draw
+        //setup the drawing surface
         mImageView = (ImageView) findViewById(R.id.imageView_main);
         mImageView.setBackgroundColor(Color.BLACK);
-
         mBitmap = Bitmap.createBitmap(screenWidth, screenHeight, Bitmap.Config.ARGB_8888);
         mCanvas = new Canvas(mBitmap);
 
-        //Start game logic
+        //initialize game info
         totalPoints = 0;
-        currentLevel = 1;
         currentLevelPoints = 0;
         advanceLevelPoints = 100;
+        currentLevel = 1;
         levelTime = 30000;
+        levelTimeLeft = levelTime;
         gameOver = false;
 
+        //initialize game objects
+        shapes = new ArrayList<Shape>();
         mTextViewTime = (TextView) findViewById(R.id.textView_time);
         mTextViewTotalPoints = (TextView) findViewById(R.id.textView_totalPoints);
         mTextViewLevelPoints = (TextView) findViewById(R.id.textView_levelPoints);
         mTextViewRectCount = (TextView) findViewById(R.id.textView_rectCount);
         mTextViewCircleCount = (TextView) findViewById(R.id.textView_circCount);
+        clearButton = (Button) findViewById(R.id.button_clear);
+        rectButton = (Button) findViewById(R.id.button_rect);
+        circButton = (Button) findViewById(R.id.button_circ);
 
-        gameTimer = new CountDownTimer(levelTime, 1000) {
-            @Override
-            public void onTick(long millisUntilFinished) {
-                mTextViewTime.setText("00:" + millisUntilFinished/1000);
+        mTextViewTime.setText("00:"+levelTime);
+        mTextViewTotalPoints.setText(""+totalPoints);
+        mTextViewLevelPoints.setText(""+currentLevelPoints);
 
-                Random rand = new Random();
-                final int randomTime = rand.nextInt(2000);
-                final int randomTick = rand.nextInt(1000);
-
-                shapeTimer = new CountDownTimer(randomTime, randomTick) {
-                    @Override
-                    public void onTick(long millisUntilFinished) {
-                        mTextViewCircleCount.setText("randomTime:" + randomTime);
-                        mTextViewRectCount.setText("randomTick:" + randomTick);
-                    }
-
-                    @Override
-                    public void onFinish() {
-
-                        EventProbability event = selectShapeEvent();
-
-                        if (event == EventProbability.DEFAULT) {
-
-                            Shape circle = shapeFactory.getShape(getApplicationContext(), Shape.ShapeType.CIRCLE);
-
-                            circle.onDraw(mCanvas);
-                            mImageView.setImageBitmap(mBitmap);
-                        } else if (event == EventProbability.CIRCLE) {
-                            Shape circle = shapeFactory.getShape(getApplicationContext(), Shape.ShapeType.CIRCLE);
-
-                            circle.onDraw(mCanvas);
-                            mImageView.setImageBitmap(mBitmap);
-                        } else if (event == EventProbability.RECTANGLE) {
-                            Shape rect = shapeFactory.getShape(getApplicationContext(), Shape.ShapeType.RECTANGLE);
-
-                            rect.onDraw(mCanvas);
-                            mImageView.setImageBitmap(mBitmap);
-                        }
-                    }
-                }.start();
-            }
-
-            @Override
-            public void onFinish() {
-                mTextViewTime.setText("00:00");
-                gameOver = true;
-            }
-        };
-
-        gameTimer.start();
-
-        //handle buttons here
-        Button rectButton = (Button) findViewById(R.id.button_rect);
-        rectButton.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View v) {
-
-                Shape rect = shapeFactory.getShape(v.getContext(), Shape.ShapeType.RECTANGLE);
-
-                rect.onDraw(mCanvas);
-
-                mImageView.setImageBitmap(mBitmap);
-            }
-        });
-
-        Button circButton = (Button) findViewById(R.id.button_circ);
-        circButton.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View v) {
-
-                Shape circ = shapeFactory.getShape(v.getContext(), Shape.ShapeType.CIRCLE);
-
-                circ.onDraw(mCanvas);
-
-                mImageView.setImageBitmap(mBitmap);
-            }
-        });
-
-
-        Button clearButton = (Button) findViewById(R.id.button_clear);
-        clearButton.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View v) {
-                mCanvas.drawColor(Color.BLACK);
-
-                mImageView.setImageBitmap(mBitmap);
-            }
-        });
+        startGame();
+        handleButtons();
     }
 
     @Override
@@ -231,6 +158,106 @@ public class MainActivity extends AppCompatActivity {
 
     public void updateShapeCount() {
 
+    }
+
+    public void startGame() {
+
+        gameTimer = new CountDownTimer(levelTime, 1000) {
+            @Override
+            public void onTick(long millisUntilFinished) {
+                levelTimeLeft = millisUntilFinished / 1000;
+                mTextViewTime.setText("00:" + levelTimeLeft);
+
+
+                Random rand = new Random();
+                final int randomTime = rand.nextInt(2000);
+                final int randomTick = rand.nextInt(1000);
+
+                shapeTimer = new CountDownTimer(randomTime, randomTick) {
+                    @Override
+                    public void onTick(long millisUntilFinished) {
+                        //TODO: replace with empty
+                        mTextViewCircleCount.setText("" + randomTime);
+                        mTextViewRectCount.setText("" + randomTick);
+                    }
+
+                    @Override
+                    public void onFinish() {
+
+                        EventProbability event = selectShapeEvent();
+
+                        if (event == EventProbability.DEFAULT) {
+
+                            Shape circle = shapeFactory.getShape(getApplicationContext(), Shape.ShapeType.CIRCLE);
+                            shapes.add(circle);
+
+                            circle.onDraw(mCanvas);
+                            mImageView.setImageBitmap(mBitmap);
+                        } else if (event == EventProbability.CIRCLE) {
+
+                            Shape circle = shapeFactory.getShape(getApplicationContext(), Shape.ShapeType.CIRCLE);
+                            shapes.add(circle);
+
+                            circle.onDraw(mCanvas);
+                            mImageView.setImageBitmap(mBitmap);
+                        } else if (event == EventProbability.RECTANGLE) {
+
+                            Shape rect = shapeFactory.getShape(getApplicationContext(), Shape.ShapeType.RECTANGLE);
+                            shapes.add(rect);
+
+                            rect.onDraw(mCanvas);
+                            mImageView.setImageBitmap(mBitmap);
+
+                        }
+                    }
+                }.start();
+
+            }
+
+            @Override
+            public void onFinish() {
+                mTextViewTime.setText("00:02");
+                gameOver = true;
+            }
+        };
+
+        gameTimer.start();
+    }
+
+    public void handleButtons() {
+
+        rectButton.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+
+                Shape rect = shapeFactory.getShape(v.getContext(), Shape.ShapeType.RECTANGLE);
+
+                rect.onDraw(mCanvas);
+
+                mImageView.setImageBitmap(mBitmap);
+            }
+        });
+
+        circButton.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+
+                Shape circ = shapeFactory.getShape(v.getContext(), Shape.ShapeType.CIRCLE);
+
+                circ.onDraw(mCanvas);
+
+                mImageView.setImageBitmap(mBitmap);
+            }
+        });
+
+        clearButton.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                mCanvas.drawColor(Color.BLACK);
+
+                mImageView.setImageBitmap(mBitmap);
+            }
+        });
     }
 
     public EventProbability selectShapeEvent() {
