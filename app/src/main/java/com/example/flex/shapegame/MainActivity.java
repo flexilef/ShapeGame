@@ -11,6 +11,7 @@ import android.graphics.Paint;
 import android.graphics.Point;
 import android.os.Build;
 import android.os.CountDownTimer;
+import android.os.Looper;
 import android.support.v7.app.ActionBar;
 import android.support.v7.app.AppCompatActivity;
 import android.os.Bundle;
@@ -27,7 +28,9 @@ import android.widget.LinearLayout;
 import android.widget.TextView;
 
 import java.util.ArrayList;
+import java.util.Iterator;
 import java.util.Random;
+import java.util.concurrent.TimeUnit;
 
 public class MainActivity extends AppCompatActivity {
 
@@ -77,6 +80,8 @@ public class MainActivity extends AppCompatActivity {
     private long levelTime;
     private long levelTimeLeft;
     private boolean gameOver;
+    private int mCircleCount;
+    private int mRectCount;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -110,6 +115,8 @@ public class MainActivity extends AppCompatActivity {
         levelTime = 30000;
         levelTimeLeft = levelTime;
         gameOver = false;
+        mCircleCount = 0;
+        mRectCount = 0;
 
         //initialize game objects
         shapes = new ArrayList<Shape>();
@@ -122,12 +129,17 @@ public class MainActivity extends AppCompatActivity {
         rectButton = (Button) findViewById(R.id.button_rect);
         circButton = (Button) findViewById(R.id.button_circ);
 
-        mTextViewTime.setText("00:"+levelTime);
-        mTextViewTotalPoints.setText(""+totalPoints);
-        mTextViewLevelPoints.setText(""+currentLevelPoints);
+        mTextViewTime.setText("00:" + levelTime);
+        mTextViewRectCount.setText("Rectangle: " + mRectCount);
+        mTextViewCircleCount.setText("Circle: " + mCircleCount);
+        mTextViewTotalPoints.setText("Total Points: " + totalPoints);
+        mTextViewLevelPoints.setText("Level Points: " + currentLevelPoints);
 
-        startGame();
-        handleButtons();
+        if(!gameOver) {
+
+            startGame();
+            handleButtons();
+        }
     }
 
     @Override
@@ -154,31 +166,88 @@ public class MainActivity extends AppCompatActivity {
 
     public void adjustShapeAlpha() {
 
+        //clear canvas
+        mCanvas.drawColor(Color.BLACK);
+
+        for(Iterator<Shape> iterator = shapes.iterator(); iterator.hasNext();) {
+
+            Shape shape = iterator.next();
+
+            int alpha = shape.getColorAlpha();
+            float alphaDecrease = .75f;
+            int threshold = 50;
+
+            alpha = (int) (alpha * alphaDecrease);
+            if (alpha < threshold) {
+
+                shape.removeShape();
+                iterator.remove();
+            }
+            else {
+                shape.setColorAlpha(alpha);
+            }
+
+            shape.onDraw(mCanvas);
+        }
+
+        mImageView.setImageBitmap(mBitmap);
     }
 
     public void updateShapeCount() {
 
+        int circleCount = 0;
+        int rectCount = 0;
+
+        for(Shape shape : shapes) {
+
+            if(shape.getShapeType() == Shape.ShapeType.CIRCLE) {
+                circleCount++;
+                mCircleCount++;
+            }
+            else if(shape.getShapeType() == Shape.ShapeType.RECTANGLE) {
+                rectCount++;
+                mRectCount++;
+            }
+        }
+
+        mTextViewRectCount.setText("Rectangle: " + rectCount);
+        mTextViewCircleCount.setText("Circle: " + circleCount);
     }
 
     public void startGame() {
 
-        gameTimer = new CountDownTimer(levelTime, 1000) {
+        gameTimer = new CountDownTimer(levelTime, 500) {
             @Override
             public void onTick(long millisUntilFinished) {
-                levelTimeLeft = millisUntilFinished / 1000;
-                mTextViewTime.setText("00:" + levelTimeLeft);
 
+                //update Timer
+                levelTimeLeft = millisUntilFinished;
 
+                //mTextViewTime.setText(String.format("%02d:%02d:%02d",
+                //            TimeUnit.MILLISECONDS.toMinutes(levelTimeLeft),
+                //                    TimeUnit.MILLISECONDS.toSeconds(levelTimeLeft) -
+                //                            TimeUnit.MINUTES.toSeconds(TimeUnit.MILLISECONDS.toMinutes(levelTimeLeft))));
+
+                mTextViewTime.setText(""+levelTimeLeft);
+
+                //spawn shapes when shapeTimer finishes
                 Random rand = new Random();
+                int maxTimeTillNextShape = 5000; //5 secs
+                int minTimeTillNextShape = 3000; //3 secs
+                int maxTick = 2000;
+                int minTick = 1000;
+                //final int randomTime = (int) (rand.nextFloat()*(maxTimeTillNextShape-minTimeTillNextShape) + minTimeTillNextShape);
+                //final int randomTick = (int) (rand.nextFloat()*(maxTick-minTick) + minTick);
                 final int randomTime = rand.nextInt(2000);
                 final int randomTick = rand.nextInt(1000);
+
+                updateShapeCount();
+                adjustShapeAlpha();
 
                 shapeTimer = new CountDownTimer(randomTime, randomTick) {
                     @Override
                     public void onTick(long millisUntilFinished) {
-                        //TODO: replace with empty
-                        mTextViewCircleCount.setText("" + randomTime);
-                        mTextViewRectCount.setText("" + randomTick);
+                        //do nothing. Wait for this timer to finish
                     }
 
                     @Override
@@ -192,31 +261,37 @@ public class MainActivity extends AppCompatActivity {
                             shapes.add(circle);
 
                             circle.onDraw(mCanvas);
-                            mImageView.setImageBitmap(mBitmap);
-                        } else if (event == EventProbability.CIRCLE) {
+                        }
+                        else if (event == EventProbability.CIRCLE) {
 
                             Shape circle = shapeFactory.getShape(getApplicationContext(), Shape.ShapeType.CIRCLE);
                             shapes.add(circle);
 
                             circle.onDraw(mCanvas);
-                            mImageView.setImageBitmap(mBitmap);
-                        } else if (event == EventProbability.RECTANGLE) {
+                        }
+                        else if (event == EventProbability.RECTANGLE) {
 
                             Shape rect = shapeFactory.getShape(getApplicationContext(), Shape.ShapeType.RECTANGLE);
                             shapes.add(rect);
 
                             rect.onDraw(mCanvas);
-                            mImageView.setImageBitmap(mBitmap);
-
                         }
+
+                        mImageView.setImageBitmap(mBitmap);
+
                     }
                 }.start();
-
             }
 
             @Override
             public void onFinish() {
-                mTextViewTime.setText("00:02");
+
+                mTextViewTime.setText("00:00");
+                mTextViewRectCount.setText("Rectangle: " + mRectCount);
+                mTextViewCircleCount.setText("Circle: " + mCircleCount);
+                mTextViewTotalPoints.setText("Total Points: " + totalPoints);
+                mTextViewLevelPoints.setText("Level Points: " + currentLevelPoints);
+
                 gameOver = true;
             }
         };
