@@ -33,10 +33,16 @@ public class Circle extends Shape {
         this.radius = radius;
     }
 
+    public float getRadius() {
+
+        return radius;
+    }
+
     public void setSize(float params[]) {
 
         if(params != null && params.length == 1) {
-            this.radius = params[0];
+            //this.radius = params[0];
+            setRadius(params[0]);
         }
         else {
             throw new RuntimeException("Error: Failed to set Circle's size... Argument list is not 1 element");

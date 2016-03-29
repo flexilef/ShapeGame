@@ -41,7 +41,7 @@ public class ShapeFactory {
                 Coordinates coords = new Coordinates(xCoord, yCoord);
 
                 //colors
-                int alpha = rand.nextInt(256);
+                int alpha = 255;//rand.nextInt(256);
                 int red = rand.nextInt(256);
                 int green = rand.nextInt(256);
                 int blue = rand.nextInt(256);
@@ -59,7 +59,7 @@ public class ShapeFactory {
                 float yCoord = rand.nextFloat()*screenHeight;
                 Coordinates coords = new Coordinates(xCoord, yCoord);
 
-                int alpha = rand.nextInt(256);
+                int alpha = 255;//rand.nextInt(256);
                 int red = rand.nextInt(256);
                 int green = rand.nextInt(256);
                 int blue = rand.nextInt(256);

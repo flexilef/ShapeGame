@@ -76,7 +76,6 @@ public abstract class Shape extends View {
 
     public abstract ShapeType getShapeType();
     public abstract void onDraw(Canvas canvas);
-
     //params is an array of floats used to initialize the size of a shape
     public abstract void setSize(float[] params);
 }

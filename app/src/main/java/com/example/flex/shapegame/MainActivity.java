@@ -1,30 +1,21 @@
 package com.example.flex.shapegame;
 
-import android.annotation.TargetApi;
-import android.content.res.Configuration;
-import android.content.res.Resources;
 import android.graphics.Bitmap;
 import android.graphics.Canvas;
 import android.graphics.Color;
-import android.graphics.CornerPathEffect;
 import android.graphics.Paint;
 import android.graphics.Point;
-import android.os.Build;
+import android.graphics.PorterDuff;
 import android.os.CountDownTimer;
-import android.os.Looper;
 import android.support.v7.app.ActionBar;
 import android.support.v7.app.AppCompatActivity;
 import android.os.Bundle;
-import android.util.DisplayMetrics;
 import android.util.Log;
 import android.view.Display;
-import android.view.LayoutInflater;
-import android.view.Menu;
-import android.view.MenuItem;
+import android.view.MotionEvent;
 import android.view.View;
 import android.widget.Button;
 import android.widget.ImageView;
-import android.widget.LinearLayout;
 import android.widget.TextView;
 
 import java.util.ArrayList;
@@ -35,17 +26,21 @@ import java.util.concurrent.TimeUnit;
 public class MainActivity extends AppCompatActivity {
 
     public enum EventProbability {
-        DEFAULT(0),
-        CIRCLE(80),
-        RECTANGLE(20);
+        NONE(95),
+        CIRCLE(4),
+        RECTANGLE(1);
 
-        private final int weight;
+        private int weight;
         EventProbability(int probability) {
             this.weight = probability;
         }
 
         public int getWeight() {
             return weight;
+        }
+
+        public void setWeight(int weight) {
+            this.weight = weight;
         }
     }
     private final ShapeFactory shapeFactory = new ShapeFactory();
@@ -54,15 +49,16 @@ public class MainActivity extends AppCompatActivity {
     private ImageView mImageView;
     private Bitmap mBitmap;
     private Canvas mCanvas;
+    boolean isOnDeathAnimation = false;
+    private int deathAnimationAlpha = 127;
 
-    //screen info
+    //Screen info
     private int screenWidth;
     private int screenHeight;
 
-    //Game Objects
+    //Game objects
     private ArrayList<Shape> shapes;
     private CountDownTimer gameTimer;
-    private CountDownTimer shapeTimer;
     private TextView mTextViewTime;
     private TextView mTextViewTotalPoints;
     private TextView mTextViewLevelPoints;
@@ -72,16 +68,22 @@ public class MainActivity extends AppCompatActivity {
     private Button circButton;
     private Button clearButton;
 
-    //game info
+    //Game info
+    private boolean gameOver;
     private int totalPoints;
     private int currentLevelPoints;
-    private int advanceLevelPoints;
-    private int currentLevel;
+    private int advanceLevelPoints; //not used yet
+    private int currentLevel; //not used yet
     private long levelTime;
     private long levelTimeLeft;
-    private boolean gameOver;
-    private int mCircleCount;
-    private int mRectCount;
+    private int currentCircleCount;
+    private int currentRectCount;
+    private int totalCircleCount;
+    private int totalRectCount;
+    private int circlesPopped;
+    private int rectsPopped;
+    private int circlePoints;
+    private int rectPoints;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -104,77 +106,315 @@ public class MainActivity extends AppCompatActivity {
         //setup the drawing surface
         mImageView = (ImageView) findViewById(R.id.imageView_main);
         mImageView.setBackgroundColor(Color.BLACK);
+
+        View.OnTouchListener imageViewOnTouchListener = new View.OnTouchListener() {
+            @Override
+            public boolean onTouch(View v, MotionEvent event) {
+
+                int action = event.getAction();
+
+                if(v == mImageView) {
+                    if(action == MotionEvent.ACTION_DOWN) {
+
+                        float touchedX = event.getX();
+                        float touchedY = event.getY();
+
+                        for(Iterator<Shape> iterator = shapes.iterator(); iterator.hasNext();) {
+
+                            Shape s = iterator.next();
+
+                            float x = s.getCoords().x;
+                            float y = s.getCoords().y;
+
+                            if(s.getShapeType() == Shape.ShapeType.CIRCLE) {
+                                    Circle circle = (Circle) s;
+
+                                    if (Math.sqrt((touchedX - x) * (touchedX - x) + (touchedY - y) * (touchedY - y))
+                                            <= circle.getRadius())
+                                    {
+                                        s.removeShape();
+                                        iterator.remove();
+
+                                        circlesPopped++;
+                                        totalPoints += circlePoints;
+                                        currentLevelPoints += circlePoints;
+
+                                        //set this to run the animation in render game
+                                        isOnDeathAnimation = true;
+                                    }
+                            }
+                            else if(s.getShapeType() == Shape.ShapeType.RECTANGLE) {
+
+                                Rectangle rect = (Rectangle) s;
+
+                                if (Math.abs(touchedX - x) <= rect.getRectLength() / 2 &&
+                                        Math.abs(touchedY - y) <= rect.getRectWidth() / 2) {
+                                    s.removeShape();
+                                    iterator.remove();
+
+                                    rectsPopped++;
+                                    totalPoints += rectPoints;
+                                    currentLevelPoints += rectPoints;
+
+                                    isOnDeathAnimation = true;
+                                }
+                            }
+                        }
+                    }
+                }
+
+                return false;
+            }
+        };
+        mImageView.setOnTouchListener(imageViewOnTouchListener);
         mBitmap = Bitmap.createBitmap(screenWidth, screenHeight, Bitmap.Config.ARGB_8888);
         mCanvas = new Canvas(mBitmap);
 
         //initialize game info
+        gameOver = false;
         totalPoints = 0;
         currentLevelPoints = 0;
-        advanceLevelPoints = 100;
-        currentLevel = 1;
+        advanceLevelPoints = 100; //not used yet
+        currentLevel = 1; //not used yet
         levelTime = 30000;
         levelTimeLeft = levelTime;
-        gameOver = false;
-        mCircleCount = 0;
-        mRectCount = 0;
+        currentCircleCount = 0;
+        totalCircleCount = 0;
+        currentRectCount = 0;
+        totalRectCount = 0;
+        circlesPopped = 0;
+        rectsPopped = 0;
+        circlePoints = 1;
+        rectPoints = 4;
 
-        //initialize game objects
+        //initialize game ui objects
         shapes = new ArrayList<Shape>();
-        mTextViewTime = (TextView) findViewById(R.id.textView_time);
-        mTextViewTotalPoints = (TextView) findViewById(R.id.textView_totalPoints);
-        mTextViewLevelPoints = (TextView) findViewById(R.id.textView_levelPoints);
-        mTextViewRectCount = (TextView) findViewById(R.id.textView_rectCount);
-        mTextViewCircleCount = (TextView) findViewById(R.id.textView_circCount);
-        clearButton = (Button) findViewById(R.id.button_clear);
-        rectButton = (Button) findViewById(R.id.button_rect);
-        circButton = (Button) findViewById(R.id.button_circ);
 
-        mTextViewTime.setText("00:" + levelTime);
-        mTextViewRectCount.setText("Rectangle: " + mRectCount);
-        mTextViewCircleCount.setText("Circle: " + mCircleCount);
-        mTextViewTotalPoints.setText("Total Points: " + totalPoints);
-        mTextViewLevelPoints.setText("Level Points: " + currentLevelPoints);
+        mTextViewTime = (TextView) findViewById(R.id.textView_time);
+        mTextViewTime.setTextColor(Color.argb(255, 164, 192, 39));
+
+        mTextViewTotalPoints = (TextView) findViewById(R.id.textView_totalPoints);
+        mTextViewTotalPoints.setTextColor(Color.argb(255, 164, 192, 39));
+
+        mTextViewLevelPoints = (TextView) findViewById(R.id.textView_levelPoints);
+        mTextViewLevelPoints.setTextColor(Color.argb(255, 164, 192, 39));
+
+        mTextViewRectCount = (TextView) findViewById(R.id.textView_rectCount);
+        mTextViewRectCount.setTextColor(Color.argb(255, 164, 192, 39));
+
+        mTextViewCircleCount = (TextView) findViewById(R.id.textView_circCount);
+        mTextViewCircleCount.setTextColor(Color.argb(255, 164, 192, 39));
+
+        clearButton = (Button) findViewById(R.id.button_clear);
+        clearButton.getBackground().setColorFilter(0xffffC639, PorterDuff.Mode.MULTIPLY);
+
+        rectButton = (Button) findViewById(R.id.button_rect);
+        rectButton.getBackground().setColorFilter(0xffA4C639, PorterDuff.Mode.MULTIPLY);
+
+        circButton = (Button) findViewById(R.id.button_circ);
+        circButton.getBackground().setColorFilter(0xffA4C639, PorterDuff.Mode.MULTIPLY);
 
         if(!gameOver) {
-
+            resetTextViews();
             startGame();
             handleButtons();
         }
     }
 
-    @Override
-    public boolean onCreateOptionsMenu(Menu menu) {
-        // Inflate the menu; this adds items to the action bar if it is present.
-        getMenuInflater().inflate(R.menu.menu_main, menu);
-        return true;
+    public void startGame() {
+
+        gameTimer = new CountDownTimer(levelTime, 50) {
+            @Override
+            public void onTick(long millisUntilFinished) {
+
+                //update Timer
+                levelTimeLeft = millisUntilFinished;
+                long minutes = TimeUnit.MILLISECONDS.toMinutes(levelTimeLeft);
+                long seconds = TimeUnit.MILLISECONDS.toSeconds(levelTimeLeft) -
+                                TimeUnit.MINUTES.toSeconds(minutes);
+                long milliSeconds = levelTimeLeft - TimeUnit.MINUTES.toMillis(minutes) -
+                                    TimeUnit.SECONDS.toMillis(seconds);
+
+                if(levelTimeLeft < 3000) {
+                    mTextViewTime.setTextColor(Color.argb(255, 255, 0, 39));
+                }
+                else if(levelTimeLeft < levelTime/2) {
+                    mTextViewTime.setTextColor(Color.argb(255, 255, 192, 39));
+                }
+
+                mTextViewTime.setText(String.format("%02d:%02d", seconds, milliSeconds / 10));
+
+                updateGame();
+                renderGame();
+            }
+
+            @Override
+            public void onFinish() {
+
+                gameOver = true;
+                resetTextViews();
+
+                Paint paint = new Paint();
+                paint.setColor(Color.argb( 255, 164, 198, 57 ));
+                paint.setTextSize(48.0f);
+
+                float lineSize = paint.getTextSize();
+                int lineMultiplier = 0;
+
+                mCanvas.drawColor(Color.BLACK);
+
+                paint.setColor(Color.argb(255, 255, 198, 57));
+                mCanvas.drawText("GAME OVER!", screenWidth / 4, screenHeight / 4 + (lineSize * lineMultiplier), paint);
+                lineMultiplier++;
+                lineMultiplier++;
+
+                paint.setColor(Color.argb( 255, 164, 198, 57 ));
+                mCanvas.drawText("Circles Popped- " + circlesPopped,
+                        screenWidth / 12, screenHeight / 4 + (lineSize * lineMultiplier), paint);
+                lineMultiplier++;
+
+                mCanvas.drawText("Rectangles Popped- " + rectsPopped,
+                        screenWidth/12, screenHeight/4+(lineSize*lineMultiplier), paint);
+                lineMultiplier++;
+
+                mCanvas.drawText("Total Circles - " + totalCircleCount,
+                        screenWidth/12, screenHeight/4+(lineSize*lineMultiplier), paint);
+                lineMultiplier++;
+
+                mCanvas.drawText("Total Rectangles - " + totalRectCount,
+                        screenWidth/12, screenHeight/4+(lineSize*lineMultiplier), paint);
+                lineMultiplier++;
+
+                paint.setColor(Color.argb(255, 255, 198, 57));
+                mCanvas.drawText("Pop % - " + (float)(circlesPopped+rectsPopped)/(totalCircleCount+totalRectCount)*100 + "%",
+                        screenWidth/12, screenHeight/4+(lineSize*lineMultiplier), paint);
+                lineMultiplier++;
+
+                mCanvas.drawText("Total Points - " + totalPoints,
+                        screenWidth/12, screenHeight/4+(lineSize*lineMultiplier), paint);
+                lineMultiplier++;
+            }
+        };
+
+        gameTimer.start();
     }
 
-    @Override
-    public boolean onOptionsItemSelected(MenuItem item) {
-        // Handle action bar item clicks here. The action bar will
-        // automatically handle clicks on the Home/Up button, so long
-        // as you specify a parent activity in AndroidManifest.xml.
-        int id = item.getItemId();
+    public void handleButtons() {
 
-        //noinspection SimplifiableIfStatement
-        if (id == R.id.action_settings) {
-            return true;
+        //Spawns several rectangles
+        rectButton.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+
+                for(int i = 0; i < 5; i++ ) {
+
+                    Shape rect = shapeFactory.getShape(v.getContext(), Shape.ShapeType.RECTANGLE);
+                    totalRectCount++;
+                    shapes.add(rect);
+                }
+            }
+        });
+
+        //Spawns several circles
+        circButton.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+
+                for(int i = 0; i < 5; i++ ) {
+
+                    Shape circ = shapeFactory.getShape(v.getContext(), Shape.ShapeType.CIRCLE);
+                    totalCircleCount++;
+                    shapes.add(circ);
+                }
+            }
+        });
+
+        //clear button pops all shapes
+        clearButton.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+
+                for (Iterator<Shape> iterator = shapes.iterator(); iterator.hasNext(); ) {
+
+                    Shape s = iterator.next();
+
+                    if (s.getShapeType() == Shape.ShapeType.CIRCLE) {
+
+                        currentLevelPoints += circlePoints;
+                        totalPoints += circlePoints;
+                        circlesPopped++;
+                    } else if (s.getShapeType() == Shape.ShapeType.RECTANGLE) {
+
+                        currentLevelPoints += rectPoints;
+                        totalPoints += rectPoints;
+                        rectsPopped++;
+                    }
+
+                    s.removeShape();
+                    iterator.remove();
+                }
+
+                isOnDeathAnimation = true;
+            }
+        });
+    }
+
+    public void renderGame() {
+
+        if(isOnDeathAnimation) {
+            runDeathAnimation();
+        }
+        else
+        //clear canvas
+        {
+            mCanvas.drawColor(Color.BLACK);
         }
 
-        return super.onOptionsItemSelected(item);
+        //draw game screen
+        for(Shape s : shapes) {
+
+            s.onDraw(mCanvas);
+        }
+        mImageView.setImageBitmap(mBitmap);
+    }
+
+    public void updateGame() {
+
+        //update textviews
+        mTextViewTotalPoints.setText("Tot Pts: " + totalPoints);
+        mTextViewLevelPoints.setText("Lvl Pts: " + currentLevelPoints);
+        mTextViewCircleCount.setText("Circ: " + currentCircleCount);
+        mTextViewRectCount.setText("Rec: " + currentRectCount);
+
+        //spawn shapes
+        EventProbability event = selectShapeEvent();
+        if (event == EventProbability.CIRCLE) {
+
+            Shape circle = shapeFactory.getShape(getApplicationContext(), Shape.ShapeType.CIRCLE);
+            shapes.add(circle);
+
+            totalCircleCount++;
+        }
+        else if (event == EventProbability.RECTANGLE) {
+
+            Shape rect = shapeFactory.getShape(getApplicationContext(), Shape.ShapeType.RECTANGLE);
+            shapes.add(rect);
+
+            totalRectCount++;
+        }
+
+        updateShapeCount();
+        adjustShapeAlpha();
     }
 
     public void adjustShapeAlpha() {
-
-        //clear canvas
-        mCanvas.drawColor(Color.BLACK);
 
         for(Iterator<Shape> iterator = shapes.iterator(); iterator.hasNext();) {
 
             Shape shape = iterator.next();
 
             int alpha = shape.getColorAlpha();
-            float alphaDecrease = .75f;
+            float alphaDecrease = .90f;
             int threshold = 50;
 
             alpha = (int) (alpha * alphaDecrease);
@@ -186,171 +426,74 @@ public class MainActivity extends AppCompatActivity {
             else {
                 shape.setColorAlpha(alpha);
             }
-
-            shape.onDraw(mCanvas);
         }
-
-        mImageView.setImageBitmap(mBitmap);
     }
 
     public void updateShapeCount() {
 
-        int circleCount = 0;
-        int rectCount = 0;
+        currentCircleCount = 0;
+        currentRectCount = 0;
 
         for(Shape shape : shapes) {
 
             if(shape.getShapeType() == Shape.ShapeType.CIRCLE) {
-                circleCount++;
-                mCircleCount++;
+                currentCircleCount++;
             }
             else if(shape.getShapeType() == Shape.ShapeType.RECTANGLE) {
-                rectCount++;
-                mRectCount++;
+                currentRectCount++;
             }
         }
-
-        mTextViewRectCount.setText("Rectangle: " + rectCount);
-        mTextViewCircleCount.setText("Circle: " + circleCount);
     }
 
-    public void startGame() {
+    public void runDeathAnimation() {
 
-        gameTimer = new CountDownTimer(levelTime, 500) {
-            @Override
-            public void onTick(long millisUntilFinished) {
+        float alphaDecrease = .75f;
+        int threshold = 50;
 
-                //update Timer
-                levelTimeLeft = millisUntilFinished;
+        deathAnimationAlpha = (int) (deathAnimationAlpha * alphaDecrease);
+        if(deathAnimationAlpha < threshold) {
 
-                //mTextViewTime.setText(String.format("%02d:%02d:%02d",
-                //            TimeUnit.MILLISECONDS.toMinutes(levelTimeLeft),
-                //                    TimeUnit.MILLISECONDS.toSeconds(levelTimeLeft) -
-                //                            TimeUnit.MINUTES.toSeconds(TimeUnit.MILLISECONDS.toMinutes(levelTimeLeft))));
+            isOnDeathAnimation = false;
+            deathAnimationAlpha = 127; //reset alpha
+        }
 
-                mTextViewTime.setText(""+levelTimeLeft);
-
-                //spawn shapes when shapeTimer finishes
-                Random rand = new Random();
-                int maxTimeTillNextShape = 5000; //5 secs
-                int minTimeTillNextShape = 3000; //3 secs
-                int maxTick = 2000;
-                int minTick = 1000;
-                //final int randomTime = (int) (rand.nextFloat()*(maxTimeTillNextShape-minTimeTillNextShape) + minTimeTillNextShape);
-                //final int randomTick = (int) (rand.nextFloat()*(maxTick-minTick) + minTick);
-                final int randomTime = rand.nextInt(2000);
-                final int randomTick = rand.nextInt(1000);
-
-                updateShapeCount();
-                adjustShapeAlpha();
-
-                shapeTimer = new CountDownTimer(randomTime, randomTick) {
-                    @Override
-                    public void onTick(long millisUntilFinished) {
-                        //do nothing. Wait for this timer to finish
-                    }
-
-                    @Override
-                    public void onFinish() {
-
-                        EventProbability event = selectShapeEvent();
-
-                        if (event == EventProbability.DEFAULT) {
-
-                            Shape circle = shapeFactory.getShape(getApplicationContext(), Shape.ShapeType.CIRCLE);
-                            shapes.add(circle);
-
-                            circle.onDraw(mCanvas);
-                        }
-                        else if (event == EventProbability.CIRCLE) {
-
-                            Shape circle = shapeFactory.getShape(getApplicationContext(), Shape.ShapeType.CIRCLE);
-                            shapes.add(circle);
-
-                            circle.onDraw(mCanvas);
-                        }
-                        else if (event == EventProbability.RECTANGLE) {
-
-                            Shape rect = shapeFactory.getShape(getApplicationContext(), Shape.ShapeType.RECTANGLE);
-                            shapes.add(rect);
-
-                            rect.onDraw(mCanvas);
-                        }
-
-                        mImageView.setImageBitmap(mBitmap);
-
-                    }
-                }.start();
-            }
-
-            @Override
-            public void onFinish() {
-
-                mTextViewTime.setText("00:00");
-                mTextViewRectCount.setText("Rectangle: " + mRectCount);
-                mTextViewCircleCount.setText("Circle: " + mCircleCount);
-                mTextViewTotalPoints.setText("Total Points: " + totalPoints);
-                mTextViewLevelPoints.setText("Level Points: " + currentLevelPoints);
-
-                gameOver = true;
-            }
-        };
-
-        gameTimer.start();
+        mCanvas.drawColor(Color.argb(deathAnimationAlpha, 164, 192, 39));
+        mImageView.setImageBitmap(mBitmap);
     }
 
-    public void handleButtons() {
+    public void resetTextViews() {
 
-        rectButton.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View v) {
-
-                Shape rect = shapeFactory.getShape(v.getContext(), Shape.ShapeType.RECTANGLE);
-
-                rect.onDraw(mCanvas);
-
-                mImageView.setImageBitmap(mBitmap);
-            }
-        });
-
-        circButton.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View v) {
-
-                Shape circ = shapeFactory.getShape(v.getContext(), Shape.ShapeType.CIRCLE);
-
-                circ.onDraw(mCanvas);
-
-                mImageView.setImageBitmap(mBitmap);
-            }
-        });
-
-        clearButton.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View v) {
-                mCanvas.drawColor(Color.BLACK);
-
-                mImageView.setImageBitmap(mBitmap);
-            }
-        });
+        mTextViewTime.setText("00:00");
+        mTextViewRectCount.setText("Rect: 0");
+        mTextViewCircleCount.setText("Circ: 0");
+        mTextViewTotalPoints.setText("Tot Pts: 0");
+        mTextViewLevelPoints.setText("Lvl Pts: 0");
     }
 
     public EventProbability selectShapeEvent() {
 
-        int sum = 100; //sum of weights of events
+        Random rand = new Random();
+
+        int sumOfWeights = 0;
+        int randWeight = 0;
         int total = 0;
 
-        Random rand = new Random();
-        int randNum = rand.nextInt(sum);
+        //Get sum of weights of events
+        for(EventProbability e : EventProbability.values()) {
 
+            sumOfWeights += e.getWeight();
+        }
+
+        randWeight = rand.nextInt(sumOfWeights);
+        //Get a random event (based on its weight)
         for(EventProbability e : EventProbability.values()) {
 
             total = total + e.getWeight();
-            if(total > randNum) {
+            if(total > randWeight) {
                 return e;
             }
         }
 
-        return EventProbability.DEFAULT;
+        return EventProbability.NONE;
     }
 }

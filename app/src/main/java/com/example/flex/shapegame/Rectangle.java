@@ -37,13 +37,35 @@ public class Rectangle extends Shape {
         this.color = color;
     }
 
+    public void setLength(float length) {
+
+        this.length = length;
+    }
+
+    public float getRectLength() {
+
+        return length;
+    }
+
+    public void setWidth(float width) {
+
+        this.width = width;
+    }
+
+    public float getRectWidth() {
+
+        return width;
+    }
+
     //params is expected to be two elements: the first is the length, and
     //the second is the width
     public void setSize(float[] params) {
 
         if(params != null && params.length == 2) {
-            this.length = params[0];
-            this.width = params[1];
+            //this.length = params[0];
+            //this.width = params[1];
+            setLength(params[0]);
+            setWidth(params[1]);
         }
         else {
             throw new RuntimeException("Error: Failed to set Rectangle's size... Argument list is not 2 elements");
