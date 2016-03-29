@@ -27,8 +27,8 @@ public class MainActivity extends AppCompatActivity {
 
     public enum EventProbability {
         NONE(95),
-        CIRCLE(4),
-        RECTANGLE(1);
+        CIRCLE(1),
+        RECTANGLE(4);
 
         private int weight;
         EventProbability(int probability) {
@@ -105,8 +105,6 @@ public class MainActivity extends AppCompatActivity {
 
         //setup the drawing surface
         mImageView = (ImageView) findViewById(R.id.imageView_main);
-        mImageView.setBackgroundColor(Color.BLACK);
-
         View.OnTouchListener imageViewOnTouchListener = new View.OnTouchListener() {
             @Override
             public boolean onTouch(View v, MotionEvent event) {
@@ -116,8 +114,8 @@ public class MainActivity extends AppCompatActivity {
                 if(v == mImageView) {
                     if(action == MotionEvent.ACTION_DOWN) {
 
-                        float touchedX = event.getX();
-                        float touchedY = event.getY();
+                        float touchedX = event.getRawX();
+                        float touchedY = event.getRawY();
 
                         for(Iterator<Shape> iterator = shapes.iterator(); iterator.hasNext();) {
 
@@ -127,28 +125,33 @@ public class MainActivity extends AppCompatActivity {
                             float y = s.getCoords().y;
 
                             if(s.getShapeType() == Shape.ShapeType.CIRCLE) {
-                                    Circle circle = (Circle) s;
+                                Circle circle = (Circle) s;
 
-                                    if (Math.sqrt((touchedX - x) * (touchedX - x) + (touchedY - y) * (touchedY - y))
-                                            <= circle.getRadius())
-                                    {
-                                        s.removeShape();
-                                        iterator.remove();
+                                if (Math.sqrt(Math.pow(touchedX-x, 2) + Math.pow(touchedY-y, 2))
+                                        <= circle.getRadius())
+                                {
+                                    s.removeShape();
+                                    iterator.remove();
 
-                                        circlesPopped++;
-                                        totalPoints += circlePoints;
-                                        currentLevelPoints += circlePoints;
+                                    circlesPopped++;
+                                    totalPoints += circlePoints;
+                                    currentLevelPoints += circlePoints;
 
-                                        //set this to run the animation in render game
-                                        isOnDeathAnimation = true;
-                                    }
+                                    //set this to run the animation in render game
+                                    isOnDeathAnimation = true;
+                                }
                             }
                             else if(s.getShapeType() == Shape.ShapeType.RECTANGLE) {
 
                                 Rectangle rect = (Rectangle) s;
+                                float length = rect.getRectLength();
+                                float width = rect.getRectWidth();
 
-                                if (Math.abs(touchedX - x) <= rect.getRectLength() / 2 &&
-                                        Math.abs(touchedY - y) <= rect.getRectWidth() / 2) {
+                                if (touchedX <= x+length/2 &&
+                                        touchedX >= x-length/2 &&
+                                        touchedY <= y+width/2 &&
+                                        touchedY >= y-width/2)
+                                {
                                     s.removeShape();
                                     iterator.remove();
 
@@ -364,9 +367,8 @@ public class MainActivity extends AppCompatActivity {
         if(isOnDeathAnimation) {
             runDeathAnimation();
         }
-        else
-        //clear canvas
-        {
+        else {
+            //clear canvas
             mCanvas.drawColor(Color.BLACK);
         }
 
@@ -415,7 +417,7 @@ public class MainActivity extends AppCompatActivity {
 
             int alpha = shape.getColorAlpha();
             float alphaDecrease = .90f;
-            int threshold = 50;
+            int threshold = 25;
 
             alpha = (int) (alpha * alphaDecrease);
             if (alpha < threshold) {

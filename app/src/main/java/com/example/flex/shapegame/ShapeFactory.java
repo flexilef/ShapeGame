@@ -3,8 +3,11 @@ package com.example.flex.shapegame;
 import android.content.Context;
 import android.graphics.Color;
 import android.graphics.Point;
+import android.util.Log;
 import android.view.Display;
 import android.view.WindowManager;
+import android.widget.ImageView;
+import android.widget.LinearLayout;
 
 import java.util.Random;
 
@@ -25,19 +28,26 @@ public class ShapeFactory {
 
         Point displaySize = new Point();
         display.getSize(displaySize);
+
         int screenWidth = displaySize.x;
         int screenHeight = displaySize.y;
+        //offsets account for layout heights
+        int offsetTop = screenHeight/10;
+        int offsetBot = screenHeight/10;
 
         Random rand = new Random();
-
         switch(shape) {
             case CIRCLE: {
 
-                //prepare values to initialize shape
-                float radius = rand.nextFloat()*(screenWidth/4-screenWidth/8) + screenWidth/8;
+                float maxRadius = screenWidth/4;
+                float minRadius = screenWidth/8;
 
-                float xCoord = rand.nextFloat()*screenWidth;
-                float yCoord = rand.nextFloat()*screenHeight;
+                //prepare values to initialize shape
+                float radius = rand.nextFloat()*(maxRadius-minRadius) + minRadius;
+
+                //make coordinates stay inbounds
+                float xCoord = rand.nextFloat()*(screenWidth-radius) + radius;
+                float yCoord = rand.nextFloat()*(screenHeight-radius) + radius;
                 Coordinates coords = new Coordinates(xCoord, yCoord);
 
                 //colors
@@ -51,12 +61,17 @@ public class ShapeFactory {
             }
             case RECTANGLE: {
 
-                //prepare values to initialize shape
-                float length = rand.nextFloat()*(screenWidth/2 - screenWidth/4) + screenWidth/4;
-                float width = rand.nextFloat()*(screenWidth/2 - screenWidth/4) + screenWidth/4;
+                //make it dependent on the screen width only because width < height
+                float maxSize = screenWidth/2;
+                float minSize = screenWidth/4;
 
-                float xCoord = rand.nextFloat()*screenWidth;
-                float yCoord = rand.nextFloat()*screenHeight;
+                //prepare values to initialize shape
+                float length = rand.nextFloat()*(maxSize - minSize) + minSize;
+                float width = rand.nextFloat()*(maxSize - minSize) + minSize;
+
+                float xCoord = rand.nextFloat()*(screenWidth-width) + width;
+                float yCoord = rand.nextFloat()*((screenHeight-offsetBot-length)-(length+offsetTop)) +
+                        length+offsetTop;
                 Coordinates coords = new Coordinates(xCoord, yCoord);
 
                 int alpha = 255;//rand.nextInt(256);
